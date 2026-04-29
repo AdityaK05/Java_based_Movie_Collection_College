@@ -1,0 +1,18 @@
+# Byte-compiled
+*.class
+
+# Packaged (keep cinema.jar only as backup, Dockerfile rebuilds from source)
+# cinema.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
