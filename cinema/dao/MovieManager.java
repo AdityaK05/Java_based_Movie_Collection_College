@@ -12,24 +12,43 @@ public class MovieManager {
         try {
             Class.forName("org.postgresql.Driver");
             String dbUrl = System.getenv("DATABASE_URL");
+            if (dbUrl == null || dbUrl.trim().isEmpty()) {
+                dbUrl = System.getenv("DATABASE_PUBLIC_URL");
+            }
+            if (dbUrl == null || dbUrl.trim().isEmpty()) {
+                dbUrl = System.getenv("JDBC_DATABASE_URL");
+            }
             
             if (dbUrl != null && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
                 // Parse Render or Railway URL
                 // postgres://user:password@host:port/database
                 String cleanUrl = dbUrl.replaceFirst("postgresql?://", "");
-                String[] parts = cleanUrl.split("@");
-                String[] auth = parts[0].split(":");
-                String url = "jdbc:postgresql://" + parts[1];
-                if (!url.contains("?")) {
-                    url += "?sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory";
+                int lastAt = cleanUrl.lastIndexOf('@');
+                if (lastAt != -1) {
+                    String authPart = cleanUrl.substring(0, lastAt);
+                    String hostPart = cleanUrl.substring(lastAt + 1);
+                    
+                    int firstColon = authPart.indexOf(':');
+                    String user = authPart;
+                    String password = "";
+                    if (firstColon != -1) {
+                        user = authPart.substring(0, firstColon);
+                        password = authPart.substring(firstColon + 1);
+                    }
+                    
+                    String url = "jdbc:postgresql://" + hostPart;
+                    if (!url.contains("?")) {
+                        url += "?sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory";
+                    } else {
+                        url += "&sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory";
+                    }
+                    
+                    conn = DriverManager.getConnection(url, user, password);
                 } else {
-                    url += "&sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory";
+                    conn = DriverManager.getConnection("jdbc:postgresql://" + cleanUrl);
                 }
-                
-                conn = DriverManager.getConnection(url, auth[0], auth[1]);
-            } else if (System.getenv("JDBC_DATABASE_URL") != null) {
-                // Spring Boot style env var
-                conn = DriverManager.getConnection(System.getenv("JDBC_DATABASE_URL"));
+            } else if (dbUrl != null && dbUrl.startsWith("jdbc:")) {
+                conn = DriverManager.getConnection(dbUrl);
             } else {
                 // Fallback for local development
                 conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/movie", "postgres", "postgres");

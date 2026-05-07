@@ -16,7 +16,14 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
         String portEnv = System.getenv("PORT");
-        int port = (portEnv != null) ? Integer.parseInt(portEnv) : 9090;
+        int port = 9090;
+        if (portEnv != null && !portEnv.trim().isEmpty()) {
+            try {
+                port = Integer.parseInt(portEnv.trim());
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid PORT env var: " + portEnv + ", defaulting to 9090");
+            }
+        }
 
         if (GraphicsEnvironment.isHeadless()) {
             startServer(port);
