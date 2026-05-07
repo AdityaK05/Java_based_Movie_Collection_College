@@ -37,11 +37,21 @@ public class MovieManager {
                     }
                     
                     String url = "jdbc:postgresql://" + hostPart;
+                    if (!url.contains("?")) url += "?sslmode=disable";
+                    else url += "&sslmode=disable";
+                    
                     conn = DriverManager.getConnection(url, user, password);
                 } else {
-                    conn = DriverManager.getConnection("jdbc:postgresql://" + cleanUrl);
+                    String url = "jdbc:postgresql://" + cleanUrl;
+                    if (!url.contains("?")) url += "?sslmode=disable";
+                    else url += "&sslmode=disable";
+                    conn = DriverManager.getConnection(url);
                 }
             } else if (dbUrl != null && dbUrl.startsWith("jdbc:")) {
+                if (!dbUrl.contains("sslmode=")) {
+                    if (!dbUrl.contains("?")) dbUrl += "?sslmode=disable";
+                    else dbUrl += "&sslmode=disable";
+                }
                 conn = DriverManager.getConnection(dbUrl);
             } else {
                 // Fallback for local development
