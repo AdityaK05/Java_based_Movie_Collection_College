@@ -21,9 +21,9 @@ public class MovieManager {
                 String[] auth = parts[0].split(":");
                 String url = "jdbc:postgresql://" + parts[1];
                 if (!url.contains("?")) {
-                    url += "?sslmode=disable";
+                    url += "?sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory";
                 } else {
-                    url += "&sslmode=disable";
+                    url += "&sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory";
                 }
                 
                 conn = DriverManager.getConnection(url, auth[0], auth[1]);
