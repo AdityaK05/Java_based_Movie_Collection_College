@@ -37,12 +37,6 @@ public class MovieManager {
                     }
                     
                     String url = "jdbc:postgresql://" + hostPart;
-                    if (!url.contains("?")) {
-                        url += "?sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory";
-                    } else {
-                        url += "&sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory";
-                    }
-                    
                     conn = DriverManager.getConnection(url, user, password);
                 } else {
                     conn = DriverManager.getConnection("jdbc:postgresql://" + cleanUrl);
