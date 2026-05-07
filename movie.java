@@ -97,7 +97,7 @@ public class movie extends HttpServlet {
         String portEnv = System.getenv("PORT");
         int port = (portEnv != null) ? Integer.parseInt(portEnv) : 9090;
         Server server = new Server(port);
-        ServletContextHandler handler = new ServletContextHandler();
+        ServletContextHandler handler = new ServletContextHandler(ServletContextHandler.SESSIONS);
         handler.setContextPath("/");
         handler.addServlet(new ServletHolder(new movie()), "/*");
         server.setHandler(handler);
@@ -116,6 +116,13 @@ public class movie extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         res.setContentType("text/html;charset=UTF-8");
+        
+        HttpSession session = req.getSession(true);
+        if (session.getAttribute("user") == null) {
+            renderLoginPage(req, res);
+            return;
+        }
+
         String mode = req.getParameter("viewMode");
         if (mode == null) mode = "All movies";
         
@@ -129,8 +136,10 @@ public class movie extends HttpServlet {
         out.println("*{margin:0;padding:0;box-sizing:border-box}");
         out.println("body{font-family:'Segoe UI',sans-serif;background:#08080e;color:#f0e6c8}");
         out.println(".container{display:grid;grid-template-columns:320px 1fr;gap:20px;padding:20px;max-width:1200px;margin:0 auto}");
-        out.println("header{grid-column:1/-1;background:linear-gradient(135deg,#1e1605,#0a0a14);padding:30px;border-radius:8px;border-bottom:2px solid #d4a017}");
+        out.println("header{grid-column:1/-1;background:linear-gradient(135deg,#1e1605,#0a0a14);padding:30px;border-radius:8px;border-bottom:2px solid #d4a017;position:relative;}");
         out.println("h1{color:#d4a017;font-size:32px;margin-bottom:10px}");
+        out.println(".logout-btn{position:absolute;top:30px;right:30px;background:#1c1c2c;color:#d4a017;border:1px solid #d4a017;padding:8px 15px;border-radius:4px;cursor:pointer;font-weight:bold;width:auto;margin-top:0;}");
+        out.println(".logout-btn:hover{background:#d4a017;color:#000;}");
         out.println(".tagline{color:#a09070;font-size:13px}");
         out.println(".stats{display:flex;gap:40px;margin-top:20px}");
         out.println(".stat{text-align:center}");
@@ -158,6 +167,7 @@ public class movie extends HttpServlet {
         out.println("</style></head><body>");
         
         out.println("<header>");
+        out.println("<form method='POST' style='display:inline'><input type='hidden' name='action' value='logout'><button type='submit' class='logout-btn'>Logout</button></form>");
         out.println("<h1>🎬 CINÉMA</h1>");
         out.println("<p class='tagline'>Your Personal Film Collection Manager</p>");
         out.println("<div class='stats'>");
@@ -195,6 +205,12 @@ public class movie extends HttpServlet {
         out.println("<main class='main-content'>");
         out.println("<h2>Collection</h2>");
         
+        String errorMsg = (String) session.getAttribute("error");
+        if (errorMsg != null) {
+            out.println("<div class='error' style='color:#dc3c64;background:rgba(220,60,100,0.1);padding:10px;border-radius:4px;margin-bottom:20px;'>" + esc(errorMsg) + "</div>");
+            session.removeAttribute("error");
+        }
+        
         if (list.isEmpty()) {
             out.println("<div class='empty'>No movies yet. Add your first film!</div>");
         } else {
@@ -217,29 +233,81 @@ public class movie extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         String action = req.getParameter("action");
+        HttpSession session = req.getSession(true);
         
-        if ("add".equals(action)) {
-            try {
-                String title = req.getParameter("title");
-                String genre = req.getParameter("genre");
-                double rating = Double.parseDouble(req.getParameter("rating"));
-                int year = Integer.parseInt(req.getParameter("year"));
-                mgr.addMovie(new MovieData(title, genre, rating, year));
-            } catch (Exception e) {
-                // Ignore
+        if ("login".equals(action)) {
+            String user = req.getParameter("username");
+            String pass = req.getParameter("password");
+            if ("admin".equals(user) && "admin123".equals(pass)) {
+                session.setAttribute("user", user);
+                res.sendRedirect(req.getRequestURI());
+            } else {
+                res.sendRedirect(req.getRequestURI() + "?error=1");
             }
-        } else if ("delete".equals(action)) {
-            try {
-                int idx = Integer.parseInt(req.getParameter("index"));
-                mgr.removeAt(idx);
-            } catch (Exception e) {
-                // Ignore
+            return;
+        } else if ("logout".equals(action)) {
+            session.invalidate();
+            res.sendRedirect(req.getRequestURI());
+            return;
+        }
+
+        if (session.getAttribute("user") != null) {
+            if ("add".equals(action)) {
+                try {
+                    String title = req.getParameter("title");
+                    String genre = req.getParameter("genre");
+                    double rating = Double.parseDouble(req.getParameter("rating"));
+                    int year = Integer.parseInt(req.getParameter("year"));
+                    mgr.addMovie(new MovieData(title, genre, rating, year));
+                } catch (IllegalArgumentException e) {
+                    session.setAttribute("error", e.getMessage());
+                } catch (Exception e) {
+                    session.setAttribute("error", "Invalid input format.");
+                }
+            } else if ("delete".equals(action)) {
+                try {
+                    int idx = Integer.parseInt(req.getParameter("index"));
+                    mgr.removeAt(idx);
+                } catch (Exception e) {
+                    session.setAttribute("error", "Failed to delete film.");
+                }
             }
         }
         
         res.sendRedirect(req.getRequestURI());
     }
     
+    private void renderLoginPage(HttpServletRequest req, HttpServletResponse res) throws IOException {
+        PrintWriter out = res.getWriter();
+        out.println("<!DOCTYPE html><html><head><meta charset='UTF-8'>");
+        out.println("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+        out.println("<title>CINÉMA - Login</title>");
+        out.println("<style>");
+        out.println("*{margin:0;padding:0;box-sizing:border-box}");
+        out.println("body{font-family:'Segoe UI',sans-serif;background:#08080e;color:#f0e6c8;display:flex;justify-content:center;align-items:center;height:100vh;}");
+        out.println(".login-container{background:#101a1a;padding:40px;border-radius:8px;border:1px solid #323826;width:100%;max-width:400px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.5);}");
+        out.println("h2{color:#d4a017;margin-bottom:20px;font-size:24px;}");
+        out.println(".form-group{margin-bottom:20px;text-align:left;}");
+        out.println("label{display:block;color:#a09070;font-size:12px;font-weight:bold;margin-bottom:8px}");
+        out.println("input{width:100%;padding:12px;background:#1c1c2c;color:#f0e6c8;border:1px solid #323826;border-radius:6px;font:inherit;transition:all 0.3s;}");
+        out.println("input:focus{outline:0;border-color:#d4a017;box-shadow:0 0 8px rgba(212,160,23,0.4)}");
+        out.println("button{width:100%;padding:14px;background:linear-gradient(135deg,#8c6a0f,#d4a017);color:#000;border:0;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px;font-size:16px;transition:all 0.3s;}");
+        out.println("button:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(212,160,23,0.3)}");
+        out.println(".error{color:#dc3c64;font-size:14px;margin-bottom:15px;background:rgba(220,60,100,0.1);padding:10px;border-radius:4px;}");
+        out.println("</style></head><body>");
+        out.println("<div class='login-container'>");
+        out.println("<h2>🎬 CINÉMA Login</h2>");
+        if (req.getParameter("error") != null) {
+            out.println("<div class='error'>Invalid username or password.</div>");
+        }
+        out.println("<form method='POST'>");
+        out.println("<input type='hidden' name='action' value='login'>");
+        out.println("<div class='form-group'><label>Username</label><input type='text' name='username' required placeholder='admin'></div>");
+        out.println("<div class='form-group'><label>Password</label><input type='password' name='password' required placeholder='admin123'></div>");
+        out.println("<button type='submit'>Sign In</button>");
+        out.println("</form></div></body></html>");
+    }
+
     private String esc(String s) {
         return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             .replace("\"", "&quot;").replace("'", "&#39;");
