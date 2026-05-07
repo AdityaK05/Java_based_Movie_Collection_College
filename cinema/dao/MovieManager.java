@@ -13,10 +13,11 @@ public class MovieManager {
             Class.forName("org.postgresql.Driver");
             String dbUrl = System.getenv("DATABASE_URL");
             
-            if (dbUrl != null && dbUrl.startsWith("postgres://")) {
-                // Parse Render's postgres:// URL
+            if (dbUrl != null && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
+                // Parse Render or Railway URL
                 // postgres://user:password@host:port/database
-                String[] parts = dbUrl.replace("postgres://", "").split("@");
+                String cleanUrl = dbUrl.replaceFirst("postgresql?://", "");
+                String[] parts = cleanUrl.split("@");
                 String[] auth = parts[0].split(":");
                 String url = "jdbc:postgresql://" + parts[1];
                 conn = DriverManager.getConnection(url, auth[0], auth[1]);
