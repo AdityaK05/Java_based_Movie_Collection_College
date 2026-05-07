@@ -20,7 +20,18 @@ public class MovieManager {
                 String[] parts = cleanUrl.split("@");
                 String[] auth = parts[0].split(":");
                 String url = "jdbc:postgresql://" + parts[1];
-                conn = DriverManager.getConnection(url, auth[0], auth[1]);
+                if (!url.contains("?")) {
+                    url += "?sslmode=require";
+                }
+                
+                // Set up connection properties to bypass strict SSL verification
+                java.util.Properties props = new java.util.Properties();
+                props.setProperty("user", auth[0]);
+                props.setProperty("password", auth[1]);
+                props.setProperty("ssl", "true");
+                props.setProperty("sslfactory", "org.postgresql.ssl.NonValidatingFactory");
+                
+                conn = DriverManager.getConnection(url, props);
             } else if (System.getenv("JDBC_DATABASE_URL") != null) {
                 // Spring Boot style env var
                 conn = DriverManager.getConnection(System.getenv("JDBC_DATABASE_URL"));
